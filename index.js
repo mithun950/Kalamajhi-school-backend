@@ -1,19 +1,28 @@
-const express = require('express');
-const cors = require('cors');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
-const jwt = require('jsonwebtoken');
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
+// const multer = require("multer");
+// const fs = require("fs");
+// const path = require("path");
 
-
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
+app.use(express.json({ limit: "10mb" })); 
 
-app.use(cors({ origin: '*' }));
-app.use(express.json());
+
+
+
 
 // MongoDB URI
 const uri = process.env.MONGO_URI;
@@ -27,8 +36,11 @@ const client = new MongoClient(uri, {
   }
 });
 
+
+
 let db, userCollection, noticeCollection,teacherCollection,marqueeCollection,
-testimonialCollection,opinionCollection,routineCollection,admissionCollection,statusCollection,studentsCollection, resultsCollection, finalsCollection;
+testimonialCollection,opinionCollection,routineCollection,admissionCollection,
+statusCollection,studentsCollection, resultsCollection, finalsCollection,galleryCollection;
 
 async function run() {
   try {
@@ -49,6 +61,7 @@ async function run() {
      resultsCollection = db.collection("results");
      studentsCollection = db.collection("students");
      finalsCollection = db.collection("finals");
+     galleryCollection = db.collection("gallery");
      
      
      // jwt related api
@@ -790,6 +803,61 @@ app.get("/api/results/:studentId", async (req, res) => {
 //   }
 // });
 
+// --- Get all gallery items ---
+app.get("/api/gallery", async (req, res) => {
+  try {
+    const items = await galleryCollection.find().sort({ createdAt: -1 }).toArray();
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Add new gallery item ---
+app.post("/api/gallery", async (req, res) => {
+  try {
+    const { title, imageUrl } = req.body;
+
+    if (!title || !imageUrl) {
+      return res.status(400).json({ error: "Title and imageUrl are required" });
+    }
+
+    const newItem = { title, image: imageUrl, createdAt: new Date() };
+    const result = await galleryCollection.insertOne(newItem);
+
+    res.status(201).json({ _id: result.insertedId, ...newItem });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Update gallery item ---
+app.put("/api/gallery/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, imageUrl } = req.body;
+
+    await galleryCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { title, image: imageUrl, updatedAt: new Date() } }
+    );
+
+    res.json({ message: "Updated successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Delete gallery item ---
+app.delete("/api/gallery/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await galleryCollection.deleteOne({ _id: new ObjectId(id) });
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
     // সার্ভার চালু করো
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
